@@ -2,7 +2,7 @@ name: UltimateTimber
 version: maven-version-number
 authors: [Songoda]
 main: com.songoda.ultimatetimber.UltimateTimber
-api-version: 1.13
+api-version: 1.19
 softdepend: [mcMMO, Jobs, CoreProtect]
 commands:
   ut:
