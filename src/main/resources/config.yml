@@ -317,7 +317,7 @@ trees:
       - VINE
     sapling: DARK_OAK_SAPLING
     plantable-soil: [ ]
-    max-log-distance-from-trunk: 3
+    max-log-distance-from-trunk: 4
     max-leaf-distance-from-log: 5
     search-for-leaves-diagonally: false
     drop-original-log: true
@@ -511,7 +511,7 @@ trees:
       - PALE_HANGING_MOSS
     sapling: PALE_OAK_SAPLING
     plantable-soil: [ ]
-    max-log-distance-from-trunk: 3
+    max-log-distance-from-trunk: 4
     max-leaf-distance-from-log: 5
     search-for-leaves-diagonally: false
     drop-original-log: true
