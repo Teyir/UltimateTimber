@@ -18,9 +18,11 @@ public class CommandToggle extends AbstractCommand {
     @Override
     protected ReturnType runCommand(CommandSender sender, String... args) {
         if (this.plugin.getChoppingManager().togglePlayer((Player) sender)) {
-            this.plugin.getLocale().getMessage("command.toggle.enabled").sendPrefixedMessage(sender);
+            String msgenable = this.plugin.getLocale().getMessage("command.toggle.enabled").toText();
+            this.plugin.getLocale().getMessage(msgenable).sendPrefixedMessage(sender);
         } else {
-            this.plugin.getLocale().getMessage("command.toggle.disabled").sendPrefixedMessage(sender);
+            String msgdisable = this.plugin.getLocale().getMessage("command.toggle.disabled").toText();
+            this.plugin.getLocale().getMessage(msgdisable).sendPrefixedMessage(sender);
         }
         return ReturnType.SUCCESS;
     }
@@ -42,7 +44,7 @@ public class CommandToggle extends AbstractCommand {
 
     @Override
     public String getDescription() {
-        return this.plugin.getLocale().getMessage("command.toggle.description").getMessage().toString();
+        return this.plugin.getLocale().getMessage("command.toggle.description").toText();
     }
 
 }

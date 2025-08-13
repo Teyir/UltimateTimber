@@ -17,7 +17,8 @@ public class CommandReload extends AbstractCommand {
     @Override
     protected ReturnType runCommand(CommandSender sender, String... args) {
         this.plugin.reloadConfig();
-        this.plugin.getLocale().getMessage("command.reload.reloaded").sendPrefixedMessage(sender);
+        String msgreloaded = this.plugin.getLocale().getMessage("command.reload.reloaded").toText();
+        this.plugin.getLocale().getMessage(msgreloaded).sendPrefixedMessage(sender);
         return ReturnType.SUCCESS;
     }
 
@@ -38,6 +39,6 @@ public class CommandReload extends AbstractCommand {
 
     @Override
     public String getDescription() {
-        return this.plugin.getLocale().getMessage("command.reload.description").getMessage().toString();
+        return this.plugin.getLocale().getMessage("command.reload.description").toText();
     }
 }
