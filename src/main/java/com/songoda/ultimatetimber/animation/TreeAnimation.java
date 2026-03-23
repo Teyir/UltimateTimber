@@ -11,7 +11,6 @@ import com.songoda.ultimatetimber.tree.TreeBlock;
 import com.songoda.ultimatetimber.tree.TreeBlockSet;
 import com.songoda.ultimatetimber.utils.BlockUtils;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.FallingBlock;
@@ -118,8 +117,7 @@ public abstract class TreeAnimation {
      * @param treeBlock The tree block to replace
      */
     public void replaceBlock(TreeBlock treeBlock) {
-        treeBlock.getBlock().setType(Material.AIR);
-        UltimateTimber.getInstance().getSaplingManager().replantSapling(this.detectedTree.getTreeDefinition(), treeBlock);
+        UltimateTimber.getInstance().getBlockReplacementManager().replaceBlock(treeBlock, this.detectedTree.getTreeDefinition());
     }
 
     /**

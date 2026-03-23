@@ -179,6 +179,23 @@ tree-animation-type: FANCY
 # Default: false
 scatter-tree-blocks-on-ground: false
 
+# Queued block replacement spreads setType calls across multiple ticks to reduce lag
+# Mode: ALWAYS, NEVER, DYNAMIC
+# DYNAMIC enables queuing only when online player count exceeds the threshold
+# Default: NEVER
+queued-block-replacement: NEVER
+
+# Player count threshold for DYNAMIC mode
+# When online players >= this number, queuing is enabled
+# Does nothing if queued-block-replacement is not DYNAMIC
+# Default: 20
+queued-block-replacement-threshold: 20
+
+# Maximum number of block replace operations per tick when queued
+# Higher = faster tree removal but more tick time used
+# Default: 1000
+queued-block-replacement-max-per-tick: 1000
+
 # Tree configuration
 # Allows for extreme fine-tuning of tree detection and what are considered trees
 # Multiple log and leaf types are allowed, only one sapling type is allowed

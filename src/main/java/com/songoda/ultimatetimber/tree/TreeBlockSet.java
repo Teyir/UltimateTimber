@@ -10,24 +10,31 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class TreeBlockSet<BlockType> implements Collection {
+public class TreeBlockSet<BlockType> implements Collection<ITreeBlock<BlockType>> {
     private final ITreeBlock<BlockType> initialLogBlock;
     private List<ITreeBlock<BlockType>> logBlocks;
     private final List<ITreeBlock<BlockType>> leafBlocks;
+    private final Set<ITreeBlock<BlockType>> allTreeBlocks;
+    private final Set<ITreeBlock<BlockType>> allTreeBlocksView;
 
     public TreeBlockSet() {
         this.initialLogBlock = null;
         this.logBlocks = new LinkedList<>();
         this.leafBlocks = new LinkedList<>();
+        this.allTreeBlocks = new HashSet<>();
+        this.allTreeBlocksView = Collections.unmodifiableSet(this.allTreeBlocks);
     }
 
     public TreeBlockSet(ITreeBlock<BlockType> initialLogBlock) {
         this.initialLogBlock = initialLogBlock;
         this.logBlocks = new LinkedList<>();
         this.leafBlocks = new LinkedList<>();
+        this.allTreeBlocks = new HashSet<>();
+        this.allTreeBlocksView = Collections.unmodifiableSet(this.allTreeBlocks);
 
         if (initialLogBlock != null) {
             this.logBlocks.add(initialLogBlock);
+            this.allTreeBlocks.add(initialLogBlock);
         }
     }
 
@@ -64,29 +71,32 @@ public class TreeBlockSet<BlockType> implements Collection {
      * @return A Set of all TreeBlocks
      */
     public Set<ITreeBlock<BlockType>> getAllTreeBlocks() {
-        Set<ITreeBlock<BlockType>> treeBlocks = new HashSet<>();
-        treeBlocks.addAll(this.logBlocks);
-        treeBlocks.addAll(this.leafBlocks);
-        return treeBlocks;
+        return this.allTreeBlocksView;
+    }
+
+    private void rebuildAllTreeBlocksSet() {
+        this.allTreeBlocks.clear();
+        this.allTreeBlocks.addAll(this.logBlocks);
+        this.allTreeBlocks.addAll(this.leafBlocks);
     }
 
     @Override
     public int size() {
-        return this.logBlocks.size() + this.leafBlocks.size();
+        return this.allTreeBlocks.size();
     }
 
     @Override
     public boolean isEmpty() {
-        return this.logBlocks.isEmpty() && this.leafBlocks.isEmpty();
+        return this.allTreeBlocks.isEmpty();
     }
 
     @Override
     public boolean contains(Object o) {
-        return this.logBlocks.contains(o) || this.leafBlocks.contains(o);
+        return this.allTreeBlocks.contains(o);
     }
 
     @Override
-    public Iterator iterator() {
+    public Iterator<ITreeBlock<BlockType>> iterator() {
         return this.getAllTreeBlocks().iterator();
     }
 
@@ -96,19 +106,29 @@ public class TreeBlockSet<BlockType> implements Collection {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public boolean add(Object o) {
-        if (!(o instanceof ITreeBlock)) {
+    public boolean add(ITreeBlock<BlockType> treeBlock) {
+        if (treeBlock == null) {
             return false;
         }
-        ITreeBlock treeBlock = (ITreeBlock) o;
+
+        if (!this.allTreeBlocks.add(treeBlock)) {
+            return false;
+        }
+
+        boolean added;
         switch (treeBlock.getTreeBlockType()) {
             case LOG:
-                return this.logBlocks.add(treeBlock);
+                added = this.logBlocks.add(treeBlock);
+                break;
             case LEAF:
-                return this.leafBlocks.add(treeBlock);
+                added = this.leafBlocks.add(treeBlock);
+                break;
+            default:
+                this.allTreeBlocks.remove(treeBlock);
+                return false;
         }
-        return false;
+
+        return added;
     }
 
     @Override
@@ -116,21 +136,38 @@ public class TreeBlockSet<BlockType> implements Collection {
         if (!(o instanceof ITreeBlock)) {
             return false;
         }
-        ITreeBlock treeBlock = (ITreeBlock) o;
+        @SuppressWarnings("unchecked")
+        ITreeBlock<BlockType> treeBlock = (ITreeBlock<BlockType>) o;
+
+        if (!this.allTreeBlocks.remove(treeBlock)) {
+            return false;
+        }
+
+        boolean removed;
         switch (treeBlock.getTreeBlockType()) {
             case LOG:
-                return this.logBlocks.remove(treeBlock);
+                removed = this.logBlocks.remove(treeBlock);
+                break;
             case LEAF:
-                return this.leafBlocks.remove(treeBlock);
+                removed = this.leafBlocks.remove(treeBlock);
+                break;
+            default:
+                this.allTreeBlocks.add(treeBlock);
+                return false;
         }
-        return false;
+
+        if (!removed) {
+            this.allTreeBlocks.add(treeBlock);
+        }
+
+        return removed;
     }
 
     @Override
-    public boolean addAll(Collection c) {
+    public boolean addAll(Collection<? extends ITreeBlock<BlockType>> c) {
         boolean allAdded = true;
-        for (Object o : c) {
-            if (!this.add(o)) {
+        for (ITreeBlock<BlockType> treeBlock : c) {
+            if (!this.add(treeBlock)) {
                 allAdded = false;
             }
         }
@@ -139,34 +176,37 @@ public class TreeBlockSet<BlockType> implements Collection {
 
     @Override
     public void clear() {
+        if (this.allTreeBlocks.isEmpty()) {
+            return;
+        }
+
         this.logBlocks.clear();
         this.leafBlocks.clear();
+        this.allTreeBlocks.clear();
     }
 
     @Override
-    public boolean retainAll(Collection c) {
-        boolean retainedAll = true;
-        for (Object o : c) {
-            if (!this.contains(o)) {
-                this.remove(o);
-            } else {
-                retainedAll = false;
-            }
+    public boolean retainAll(Collection<?> c) {
+        boolean changed = this.logBlocks.retainAll(c);
+        changed |= this.leafBlocks.retainAll(c);
+
+        if (changed) {
+            this.rebuildAllTreeBlocksSet();
         }
-        return retainedAll;
+
+        return changed;
     }
 
     @Override
-    public boolean removeAll(Collection c) {
-        boolean removedAll = true;
-        for (Object o : c) {
-            if (this.contains(o)) {
-                this.remove(o);
-            } else {
-                removedAll = false;
-            }
+    public boolean removeAll(Collection<?> c) {
+        boolean changed = this.logBlocks.removeAll(c);
+        changed |= this.leafBlocks.removeAll(c);
+
+        if (changed) {
+            this.rebuildAllTreeBlocksSet();
         }
-        return removedAll;
+
+        return changed;
     }
 
     public void sortAndLimit(int max) {
@@ -186,6 +226,8 @@ public class TreeBlockSet<BlockType> implements Collection {
                 }
             }
         }
+
+        this.rebuildAllTreeBlocksSet();
     }
 
     /**
@@ -198,18 +240,24 @@ public class TreeBlockSet<BlockType> implements Collection {
         if (treeBlockType == TreeBlockType.LOG) {
             boolean removedAny = !this.logBlocks.isEmpty();
             this.logBlocks.clear();
+            if (removedAny) {
+                this.rebuildAllTreeBlocksSet();
+            }
             return removedAny;
         }
         if (treeBlockType == TreeBlockType.LEAF) {
             boolean removedAny = !this.leafBlocks.isEmpty();
             this.leafBlocks.clear();
+            if (removedAny) {
+                this.rebuildAllTreeBlocksSet();
+            }
             return removedAny;
         }
         return false;
     }
 
     @Override
-    public boolean containsAll(Collection c) {
+    public boolean containsAll(Collection<?> c) {
         for (Object o : c) {
             if (!this.contains(o)) {
                 return false;
@@ -219,15 +267,7 @@ public class TreeBlockSet<BlockType> implements Collection {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public Object[] toArray(Object[] a) {
-        Set<ITreeBlock<BlockType>> treeBlocks = new HashSet<>();
-        for (Object o : a) {
-            if (o instanceof ITreeBlock) {
-                treeBlocks.add((ITreeBlock<BlockType>) o);
-            }
-        }
-
-        return treeBlocks.toArray();
+    public <T> T[] toArray(T[] a) {
+        return this.getAllTreeBlocks().toArray(a);
     }
 }

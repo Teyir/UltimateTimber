@@ -307,12 +307,25 @@ public class TreeDefinitionManager extends Manager {
      * @return A Set of TreeDefinitions narrowed down
      */
     public Set<TreeDefinition> narrowTreeDefinition(Set<TreeDefinition> possibleTreeDefinitions, Block block, TreeBlockType treeBlockType) {
+        XMaterial blockMaterial = CompatibleMaterial.getMaterial(block.getType()).orElse(null);
+        return this.narrowTreeDefinition(possibleTreeDefinitions, blockMaterial, treeBlockType);
+    }
+
+    /**
+     * Narrows a Set of TreeDefinitions down to ones matching the given XMaterial and TreeBlockType
+     *
+     * @param possibleTreeDefinitions The possible TreeDefinitions
+     * @param blockMaterial           The pre-resolved XMaterial of the block
+     * @param treeBlockType           The TreeBlockType of the given Block
+     * @return A Set of TreeDefinitions narrowed down
+     */
+    public Set<TreeDefinition> narrowTreeDefinition(Set<TreeDefinition> possibleTreeDefinitions, XMaterial blockMaterial, TreeBlockType treeBlockType) {
         Set<TreeDefinition> matchingTreeDefinitions = new HashSet<>();
         switch (treeBlockType) {
             case LOG:
                 for (TreeDefinition treeDefinition : possibleTreeDefinitions) {
                     for (XMaterial material : treeDefinition.getLogMaterial()) {
-                        if (material == CompatibleMaterial.getMaterial(block.getType()).orElse(null)) {
+                        if (material == blockMaterial) {
                             matchingTreeDefinitions.add(treeDefinition);
                             break;
                         }
@@ -322,7 +335,7 @@ public class TreeDefinitionManager extends Manager {
             case LEAF:
                 for (TreeDefinition treeDefinition : possibleTreeDefinitions) {
                     for (XMaterial material : treeDefinition.getLeafMaterial()) {
-                        if (material == CompatibleMaterial.getMaterial(block.getType()).orElse(null)) {
+                        if (material == blockMaterial) {
                             matchingTreeDefinitions.add(treeDefinition);
                             break;
                         }

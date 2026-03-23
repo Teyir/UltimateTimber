@@ -98,14 +98,16 @@ public class TreeDetectionManager extends Manager {
         Block targetBlock = initialBlock;
         while (this.isValidLogType(possibleTreeDefinitions, null, (targetBlock = targetBlock.getRelative(BlockFace.UP)))) {
             trunkBlocks.add(targetBlock);
-            possibleTreeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(possibleTreeDefinitions, targetBlock, TreeBlockType.LOG));
+            XMaterial resolvedMaterial = CompatibleMaterial.getMaterial(targetBlock.getType()).orElse(null);
+            possibleTreeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(possibleTreeDefinitions, resolvedMaterial, TreeBlockType.LOG));
         }
 
         if (!this.onlyBreakLogsUpwards) {
             targetBlock = initialBlock;
             while (this.isValidLogType(possibleTreeDefinitions, null, (targetBlock = targetBlock.getRelative(BlockFace.DOWN)))) {
                 trunkBlocks.add(targetBlock);
-                possibleTreeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(possibleTreeDefinitions, targetBlock, TreeBlockType.LOG));
+                XMaterial resolvedMaterial = CompatibleMaterial.getMaterial(targetBlock.getType()).orElse(null);
+                possibleTreeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(possibleTreeDefinitions, resolvedMaterial, TreeBlockType.LOG));
             }
         }
 
@@ -113,14 +115,19 @@ public class TreeDetectionManager extends Manager {
         Collections.reverse(trunkBlocks);
 
         // Detect branches off the main trunk
+        Set<Location> visitedBranchLocations = new HashSet<>();
         for (Block trunkBlock : trunkBlocks) {
-            this.recursiveBranchSearch(possibleTreeDefinitions, trunkBlocks, detectedTreeBlocks, trunkBlock, initialBlock.getLocation().getBlockY());
+            this.recursiveBranchSearch(possibleTreeDefinitions, trunkBlocks, detectedTreeBlocks, trunkBlock, initialBlock.getLocation().getBlockY(), visitedBranchLocations);
         }
+
+        // Pre-compute whether diagonal leaf detection is needed
+        boolean detectLeavesDiagonally = possibleTreeDefinitions.stream().anyMatch(TreeDefinition::shouldDetectLeavesDiagonally);
 
         // Detect leaves off the trunk/branches
         Set<ITreeBlock<Block>> branchBlocks = new HashSet<>(detectedTreeBlocks.getLogBlocks());
+        Set<Location> visitedLeafLocations = new HashSet<>();
         for (ITreeBlock<Block> branchBlock : branchBlocks) {
-            this.recursiveLeafSearch(possibleTreeDefinitions, detectedTreeBlocks, branchBlock.getBlock(), new HashSet<>());
+            this.recursiveLeafSearch(possibleTreeDefinitions, detectedTreeBlocks, branchBlock.getBlock(), visitedLeafLocations, detectLeavesDiagonally);
         }
 
         // Use the first tree definition in the set
@@ -149,8 +156,9 @@ public class TreeDetectionManager extends Manager {
                 Block blockBelow = block.getRelative(BlockFace.DOWN);
                 boolean blockBelowIsLog = this.isValidLogType(possibleTreeDefinitions, null, blockBelow);
                 boolean blockBelowIsSoil = false;
+                XMaterial belowMaterial = CompatibleMaterial.getMaterial(blockBelow.getType()).orElse(null);
                 for (XMaterial material : treeDefinitionManager.getPlantableSoilMaterial(actualTreeDefinition)) {
-                    if (material == CompatibleMaterial.getMaterial(blockBelow.getType()).orElse(null)) {
+                    if (material == belowMaterial) {
                         blockBelowIsSoil = true;
                         break;
                     }
@@ -168,21 +176,28 @@ public class TreeDetectionManager extends Manager {
     /**
      * Recursively searches for branches off a given block
      *
-     * @param treeDefinitions The possible tree definitions
-     * @param trunkBlocks     The tree trunk blocks
-     * @param treeBlocks      The detected tree blocks
-     * @param block           The next block to check for a branch
-     * @param startingBlockY  The Y coordinate of the initial block
+     * @param treeDefinitions        The possible tree definitions
+     * @param trunkBlocks            The tree trunk blocks
+     * @param treeBlocks             The detected tree blocks
+     * @param block                  The next block to check for a branch
+     * @param startingBlockY         The Y coordinate of the initial block
+     * @param visitedBranchLocations Set of already visited locations to avoid redundant checks
      */
-    private void recursiveBranchSearch(Set<TreeDefinition> treeDefinitions, List<Block> trunkBlocks, TreeBlockSet<Block> treeBlocks, Block block, int startingBlockY) {
+    private void recursiveBranchSearch(Set<TreeDefinition> treeDefinitions, List<Block> trunkBlocks, TreeBlockSet<Block> treeBlocks, Block block, int startingBlockY, Set<Location> visitedBranchLocations) {
         for (Vector offset : this.onlyBreakLogsUpwards ? this.VALID_BRANCH_OFFSETS : this.VALID_TRUNK_OFFSETS) {
             Block targetBlock = block.getRelative(offset.getBlockX(), offset.getBlockY(), offset.getBlockZ());
-            TreeBlock treeBlock = new TreeBlock(targetBlock, TreeBlockType.LOG);
-            if (this.isValidLogType(treeDefinitions, trunkBlocks, targetBlock) && !treeBlocks.contains(treeBlock)) {
+            Location targetLocation = targetBlock.getLocation();
+            if (visitedBranchLocations.contains(targetLocation)) {
+                continue;
+            }
+            visitedBranchLocations.add(targetLocation);
+            if (this.isValidLogType(treeDefinitions, trunkBlocks, targetBlock)) {
+                TreeBlock treeBlock = new TreeBlock(targetBlock, TreeBlockType.LOG);
                 treeBlocks.add(treeBlock);
-                treeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(treeDefinitions, targetBlock, TreeBlockType.LOG));
+                XMaterial resolvedMaterial = CompatibleMaterial.getMaterial(targetBlock.getType()).orElse(null);
+                treeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(treeDefinitions, resolvedMaterial, TreeBlockType.LOG));
                 if (!this.onlyBreakLogsUpwards || targetBlock.getLocation().getBlockY() > startingBlockY) {
-                    this.recursiveBranchSearch(treeDefinitions, trunkBlocks, treeBlocks, targetBlock, startingBlockY);
+                    this.recursiveBranchSearch(treeDefinitions, trunkBlocks, treeBlocks, targetBlock, startingBlockY, visitedBranchLocations);
                 }
             }
         }
@@ -191,25 +206,27 @@ public class TreeDetectionManager extends Manager {
     /**
      * Recursively searches for leaves that are next to this tree
      *
-     * @param treeDefinitions The possible tree definitions
-     * @param treeBlocks      The detected tree blocks
-     * @param block           The next block to check for a leaf
+     * @param treeDefinitions        The possible tree definitions
+     * @param treeBlocks             The detected tree blocks
+     * @param block                  The next block to check for a leaf
+     * @param visitedLeafLocations   Set of already visited locations to avoid redundant checks
+     * @param detectLeavesDiagonally Whether to detect leaves diagonally (pre-computed)
      */
-    private void recursiveLeafSearch(Set<TreeDefinition> treeDefinitions, TreeBlockSet<Block> treeBlocks, Block block, Set<Block> visitedBlocks) {
-        boolean detectLeavesDiagonally = treeDefinitions.stream().anyMatch(TreeDefinition::shouldDetectLeavesDiagonally);
-
+    private void recursiveLeafSearch(Set<TreeDefinition> treeDefinitions, TreeBlockSet<Block> treeBlocks, Block block, Set<Location> visitedLeafLocations, boolean detectLeavesDiagonally) {
         for (Vector offset : !detectLeavesDiagonally ? this.VALID_LEAF_OFFSETS : this.VALID_TRUNK_OFFSETS) {
             Block targetBlock = block.getRelative(offset.getBlockX(), offset.getBlockY(), offset.getBlockZ());
-            if (visitedBlocks.contains(targetBlock)) {
+            Location targetLocation = targetBlock.getLocation();
+            if (visitedLeafLocations.contains(targetLocation)) {
                 continue;
             }
+            visitedLeafLocations.add(targetLocation);
 
-            visitedBlocks.add(targetBlock);
-            TreeBlock treeBlock = new TreeBlock(targetBlock, TreeBlockType.LEAF);
-            if (this.isValidLeafType(treeDefinitions, treeBlocks, targetBlock) && !treeBlocks.contains(treeBlock) && !this.doesLeafBorderInvalidLog(treeDefinitions, treeBlocks, targetBlock)) {
+            XMaterial resolvedMaterial = CompatibleMaterial.getMaterial(targetBlock.getType()).orElse(null);
+            if (this.isValidLeafType(treeDefinitions, treeBlocks, targetBlock, resolvedMaterial) && !this.doesLeafBorderInvalidLog(treeDefinitions, treeBlocks, targetBlock)) {
+                TreeBlock treeBlock = new TreeBlock(targetBlock, TreeBlockType.LEAF);
                 treeBlocks.add(treeBlock);
-                treeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(treeDefinitions, targetBlock, TreeBlockType.LEAF));
-                this.recursiveLeafSearch(treeDefinitions, treeBlocks, targetBlock, visitedBlocks);
+                treeDefinitions.retainAll(this.treeDefinitionManager.narrowTreeDefinition(treeDefinitions, resolvedMaterial, TreeBlockType.LEAF));
+                this.recursiveLeafSearch(treeDefinitions, treeBlocks, targetBlock, visitedLeafLocations, detectLeavesDiagonally);
             }
         }
     }
@@ -246,11 +263,14 @@ public class TreeDetectionManager extends Manager {
             return false;
         }
 
+        // Resolve the block material once
+        XMaterial blockMaterial = CompatibleMaterial.getMaterial(block.getType()).orElse(null);
+
         // Check if it matches the tree definition
         boolean isCorrectType = false;
         for (TreeDefinition treeDefinition : treeDefinitions) {
             for (XMaterial material : treeDefinition.getLogMaterial()) {
-                if (material == CompatibleMaterial.getMaterial(block.getType()).orElse(null)) {
+                if (material == blockMaterial) {
                     isCorrectType = true;
                     break;
                 }
@@ -289,9 +309,10 @@ public class TreeDetectionManager extends Manager {
      * @param treeDefinitions The Set of TreeDefinitions to compare against
      * @param treeBlocks      The detected blocks of the tree for checking leaf distance
      * @param block           The Block to check
-     * @return True if the block is a valid log type, otherwise false
+     * @param blockMaterial   The pre-resolved XMaterial of the block
+     * @return True if the block is a valid leaf type, otherwise false
      */
-    private boolean isValidLeafType(Set<TreeDefinition> treeDefinitions, TreeBlockSet<Block> treeBlocks, Block block) {
+    private boolean isValidLeafType(Set<TreeDefinition> treeDefinitions, TreeBlockSet<Block> treeBlocks, Block block, XMaterial blockMaterial) {
         // Check if block is placed
         if (this.placedBlockManager.isBlockPlaced(block)) {
             return false;
@@ -301,7 +322,7 @@ public class TreeDetectionManager extends Manager {
         boolean isCorrectType = false;
         for (TreeDefinition treeDefinition : treeDefinitions) {
             for (XMaterial material : treeDefinition.getLeafMaterial()) {
-                if (material == CompatibleMaterial.getMaterial(block.getType()).orElse(null)) {
+                if (material == blockMaterial) {
                     isCorrectType = true;
                     break;
                 }
@@ -317,7 +338,21 @@ public class TreeDetectionManager extends Manager {
             return true;
         }
 
-        int maxDistanceFromLog = treeDefinitions.stream().map(TreeDefinition::getMaxLeafDistanceFromLog).max(Integer::compareTo).orElse(0);
-        return treeBlocks.getLogBlocks().stream().anyMatch(x -> x.getLocation().distanceSquared(block.getLocation()) < maxDistanceFromLog * maxDistanceFromLog);
+        // Compute max distance once
+        int maxDistanceFromLog = 0;
+        for (TreeDefinition treeDefinition : treeDefinitions) {
+            int dist = treeDefinition.getMaxLeafDistanceFromLog();
+            if (dist > maxDistanceFromLog) {
+                maxDistanceFromLog = dist;
+            }
+        }
+        double maxDistanceSquared = (double) maxDistanceFromLog * maxDistanceFromLog;
+        Location blockLocation = block.getLocation();
+        for (ITreeBlock<Block> logBlock : treeBlocks.getLogBlocks()) {
+            if (logBlock.getLocation().distanceSquared(blockLocation) < maxDistanceSquared) {
+                return true;
+            }
+        }
+        return false;
     }
 }

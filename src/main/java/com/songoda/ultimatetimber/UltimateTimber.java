@@ -10,6 +10,7 @@ import com.songoda.third_party.com.cryptomorin.xseries.XMaterial;
 import com.songoda.ultimatetimber.commands.CommandGiveAxe;
 import com.songoda.ultimatetimber.commands.CommandReload;
 import com.songoda.ultimatetimber.commands.CommandToggle;
+import com.songoda.ultimatetimber.manager.BlockReplacementManager;
 import com.songoda.ultimatetimber.manager.PlacedBlockManager;
 import com.songoda.ultimatetimber.manager.TreeDetectionManager;
 import com.songoda.ultimatetimber.manager.ChoppingManager;
@@ -30,6 +31,7 @@ public class UltimateTimber extends SongodaPlugin {
 
     private ChoppingManager choppingManager;
     private ConfigurationManager configurationManager;
+    private BlockReplacementManager blockReplacementManager;
     private PlacedBlockManager placedBlockManager;
     private SaplingManager saplingManager;
     private TreeAnimationManager treeAnimationManager;
@@ -74,6 +76,7 @@ public class UltimateTimber extends SongodaPlugin {
         // Register managers
         this.choppingManager = this.registerManager(ChoppingManager.class);
         this.configurationManager = new ConfigurationManager(this);
+        this.blockReplacementManager = this.registerManager(BlockReplacementManager.class);
         this.placedBlockManager = this.registerManager(PlacedBlockManager.class);
         this.saplingManager = this.registerManager(SaplingManager.class);
         this.treeAnimationManager = this.registerManager(TreeAnimationManager.class);
@@ -122,6 +125,10 @@ public class UltimateTimber extends SongodaPlugin {
             ex.printStackTrace();
             return null;
         }
+    }
+
+    public BlockReplacementManager getBlockReplacementManager() {
+        return this.blockReplacementManager;
     }
 
     public ChoppingManager getChoppingManager() {

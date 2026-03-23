@@ -46,6 +46,9 @@ public class ConfigurationManager extends Manager {
         HOOKS_REQUIRE_ABILITY_ACTIVE(SettingType.BOOLEAN),
         TREE_ANIMATION_TYPE(SettingType.STRING),
         SCATTER_TREE_BLOCKS_ON_GROUND(SettingType.BOOLEAN),
+        QUEUED_BLOCK_REPLACEMENT(SettingType.STRING),
+        QUEUED_BLOCK_REPLACEMENT_THRESHOLD(SettingType.INT),
+        QUEUED_BLOCK_REPLACEMENT_MAX_PER_TICK(SettingType.INT),
         FRAGILE_BLOCKS(SettingType.STRING_LIST);
 
         private final SettingType settingType;
