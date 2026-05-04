@@ -1,6 +1,7 @@
 package com.songoda.ultimatetimber.manager;
 
 import com.songoda.core.compatibility.CompatibleMaterial;
+import com.songoda.core.compatibility.ServerVersion;
 import com.songoda.third_party.com.cryptomorin.xseries.XBlock;
 import com.songoda.third_party.com.cryptomorin.xseries.XMaterial;
 import com.songoda.ultimatetimber.UltimateTimber;
@@ -99,7 +100,21 @@ public class SaplingManager extends Manager {
         }
 
         XMaterial material = treeDefinition.getSaplingMaterial();
-        XBlock.setType(block, material);
+        if (material == null) {
+            return;
+        }
+
+        if (ServerVersion.isServerVersionAtLeast(ServerVersion.V26_1)) {
+            Material bukkitMaterial = material.parseMaterial();
+            if (bukkitMaterial == null) {
+                try {
+                    bukkitMaterial = Material.valueOf(material.name());
+                } catch (IllegalArgumentException ignored) {}
+            }
+            block.setType(bukkitMaterial);
+        } else {
+            XBlock.setType(block, material);
+        }
 
         int cooldown = ConfigurationManager.Setting.REPLANT_SAPLINGS_COOLDOWN.getInt();
         if (cooldown != 0) {
